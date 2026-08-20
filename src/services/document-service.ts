@@ -1,0 +1,10 @@
+import { invoke } from "@tauri-apps/api/core";
+import type { DocumentRequest, DocumentRequestList, DocumentType } from "../types/document";
+export const listDocumentTypes = (includeInactive = false): Promise<DocumentType[]> => invoke("list_document_types", { includeInactive });
+export const listDocumentResidents = (): Promise<{ id: number; residentCode: string; fullName: string }[]> => invoke("list_document_residents");
+export const createDocumentType = (input: { name: string; description?: string; status: string }): Promise<DocumentType> => invoke("create_document_type", { input });
+export const updateDocumentType = (documentTypeId: number, input: { name: string; description?: string; status: string }): Promise<DocumentType> => invoke("update_document_type", { documentTypeId, input });
+export const listDocumentRequests = (query: Record<string, unknown>): Promise<DocumentRequestList> => invoke("list_document_requests", { query });
+export const createDocumentRequest = (input: { residentId: number; documentTypeId: number; purpose: string }): Promise<DocumentRequest> => invoke("create_document_request", { input });
+export const updateDocumentRequestStatus = (requestId: number, status: string, rejectionReason?: string): Promise<void> => invoke("update_document_request_status", { requestId, input: { status, rejectionReason } });
+export const getCertificateData = (requestId: number): Promise<import("../types/document").CertificateData> => invoke("get_certificate_data", { requestId });

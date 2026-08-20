@@ -1,0 +1,2 @@
+ALTER TABLE `households` ADD `registered_at` text DEFAULT CURRENT_TIMESTAMP NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `household_members_resident_unique` ON `household_members` (`resident_id`);

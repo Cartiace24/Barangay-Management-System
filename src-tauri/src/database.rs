@@ -11,14 +11,37 @@ struct Migration {
     sql: &'static str,
 }
 
-const MIGRATIONS: &[Migration] = &[Migration {
-    tag: "0000_initial_schema",
-    sql: include_str!("../../drizzle/0000_initial_schema.sql"),
-}];
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        tag: "0000_initial_schema",
+        sql: include_str!("../../drizzle/0000_initial_schema.sql"),
+    },
+    Migration {
+        tag: "0001_profile_branding",
+        sql: include_str!("../../drizzle/0001_profile_branding.sql"),
+    },
+    Migration {
+        tag: "0002_residents_profile_fields",
+        sql: include_str!("../../drizzle/0002_residents_profile_fields.sql"),
+    },
+    Migration {
+        tag: "0003_household_registration",
+        sql: include_str!("../../drizzle/0003_household_registration.sql"),
+    },
+    Migration {
+        tag: "0004_document_workflow",
+        sql: include_str!("../../drizzle/0004_document_workflow.sql"),
+    },
+    Migration {
+        tag: "0005_blotter_cases",
+        sql: include_str!("../../drizzle/0005_blotter_cases.sql"),
+    },
+];
 
 #[derive(Clone)]
 pub struct Database {
     path: PathBuf,
+    data_dir: PathBuf,
 }
 
 #[derive(Debug, Serialize)]
@@ -37,14 +60,27 @@ impl Database {
         fs::create_dir_all(&data_dir)
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
 
-        Self::open(data_dir.join(DATABASE_FILE_NAME))
+        Self::open_in_directory(data_dir)
     }
 
     pub fn open(path: PathBuf) -> rusqlite::Result<Self> {
-        let database = Self { path };
+        let data_dir = path.parent().map(PathBuf::from).unwrap_or_default();
+        fs::create_dir_all(&data_dir)
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
+        let database = Self { path, data_dir };
         let mut connection = database.connect()?;
         database.apply_migrations(&mut connection)?;
         Ok(database)
+    }
+
+    pub fn data_dir(&self) -> &PathBuf {
+        &self.data_dir
+    }
+
+    fn open_in_directory(data_dir: PathBuf) -> rusqlite::Result<Self> {
+        fs::create_dir_all(&data_dir)
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
+        Self::open(data_dir.join(DATABASE_FILE_NAME))
     }
 
     pub fn connect(&self) -> rusqlite::Result<Connection> {
@@ -149,6 +185,45 @@ mod tests {
                 [],
             )
             .expect("test row should be inserted");
+        connection
+            .execute(
+                "INSERT INTO residents (resident_code, first_name, last_name, birth_date, sex, nationality, status) VALUES ('RES-TEST-001', 'Maria', 'Santos', '1990-05-12', 'female', 'Filipino', 'active')",
+                [],
+            )
+            .expect("resident row should be inserted");
+        connection
+            .execute(
+                "INSERT INTO households (household_code, address_line, status) VALUES ('HH-TEST-001', 'Test Street', 'active')",
+                [],
+            )
+            .expect("household row should be inserted");
+        connection
+            .execute(
+                "INSERT INTO household_members (household_id, resident_id, relationship_to_head, is_household_head) VALUES (1, 1, 'Household Head', 1)",
+                [],
+            )
+            .expect("household member should be inserted");
+        connection
+            .execute(
+                "INSERT INTO residents (resident_code, first_name, last_name, sex, nationality, status) VALUES ('RES-TEST-002', 'Jose', 'Santos', 'male', 'Filipino', 'active')",
+                [],
+            )
+            .expect("second resident should be inserted");
+        connection
+            .execute(
+                "INSERT INTO household_members (household_id, resident_id, relationship_to_head, is_household_head) VALUES (1, 2, 'Spouse', 0)",
+                [],
+            )
+            .expect("second household member should be added");
+        connection
+            .execute("UPDATE household_members SET is_household_head = 0 WHERE household_id = 1", [])
+            .expect("existing head should be unset");
+        connection
+            .execute("UPDATE household_members SET is_household_head = 1, relationship_to_head = 'Household Head' WHERE household_id = 1 AND resident_id = 2", [])
+            .expect("household head should be changed");
+        connection
+            .execute("DELETE FROM household_members WHERE household_id = 1 AND resident_id = 1", [])
+            .expect("former member should be removed");
         drop(connection);
         drop(database);
 
@@ -164,6 +239,22 @@ mod tests {
             )
             .expect("persisted row should be queryable");
         assert_eq!(role_count, 1);
+        let resident_count: i64 = reopened_connection
+            .query_row(
+                "SELECT COUNT(*) FROM residents WHERE last_name LIKE '%Sant%' AND nationality = 'Filipino'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("persisted resident should be searchable");
+        assert_eq!(resident_count, 2);
+        let household_count: i64 = reopened_connection
+            .query_row(
+                "SELECT COUNT(*) FROM households h JOIN household_members hm ON hm.household_id = h.id JOIN residents r ON r.id = hm.resident_id WHERE h.address_line LIKE '%Street%' AND r.first_name = 'Jose' AND hm.is_household_head = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("persisted household should be searchable through its head");
+        assert_eq!(household_count, 1);
         assert_eq!(
             reopened
                 .status()

@@ -1,0 +1,10 @@
+import { invoke } from "@tauri-apps/api/core";
+import type { Household, HouseholdInput, HouseholdListQuery, HouseholdListResult, HouseholdProfile, ResidentOption } from "../types/household";
+export const listHouseholds = (query: HouseholdListQuery): Promise<HouseholdListResult> => invoke("list_households", { query });
+export const getHouseholdProfile = (householdId: number): Promise<HouseholdProfile> => invoke("get_household_profile", { householdId });
+export const listAvailableResidents = (search?: string): Promise<ResidentOption[]> => invoke("list_available_residents", { search });
+export const createHousehold = (input: HouseholdInput): Promise<Household> => invoke("create_household", { input });
+export const updateHousehold = (householdId: number, input: HouseholdInput): Promise<Household> => invoke("update_household", { householdId, input });
+export const addHouseholdMember = (householdId: number, residentId: number, relationshipToHead: string): Promise<void> => invoke("add_household_member", { householdId, input: { residentId, relationshipToHead } });
+export const removeHouseholdMember = (householdId: number, residentId: number): Promise<void> => invoke("remove_household_member", { householdId, residentId });
+export const changeHouseholdHead = (householdId: number, residentId: number): Promise<void> => invoke("change_household_head", { householdId, residentId });

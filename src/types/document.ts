@@ -1,0 +1,4 @@
+export interface DocumentType { id: number; code: string; name: string; description: string | null; status: "active" | "inactive"; }
+export interface DocumentRequest { id: number; requestCode: string; residentId: number; residentName: string; residentCode: string; documentTypeId: number; documentType: string; purpose: string; status: "pending" | "approved" | "rejected" | "released" | "cancelled"; requestedAt: string; requestedBy: string | null; approvedBy: string | null; releasedBy: string | null; releasedAt: string | null; rejectionReason: string | null; }
+export interface DocumentRequestList { records: DocumentRequest[]; total: number; }
+export interface CertificateData { documentNumber: string; verificationToken: string; residentName: string; documentType: string; purpose: string; issuedAt: string; barangayName: string; municipality: string; province: string; address: string | null; authorizedSignatory: string | null; signatoryPosition: string | null; }

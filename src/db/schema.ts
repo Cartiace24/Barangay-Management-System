@@ -15,6 +15,9 @@ export const barangayProfile = sqliteTable("barangay_profile", {
   contactNumber: text("contact_number"),
   email: text("email"),
   logoPath: text("logo_path"),
+  authorizedSignatory: text("authorized_signatory"),
+  signatoryPosition: text("signatory_position"),
+  signaturePath: text("signature_path"),
   ...timestamps,
 });
 
@@ -72,9 +75,16 @@ export const residents = sqliteTable("residents", {
   birthDate: text("birth_date"),
   sex: text("sex", { enum: ["male", "female", "other", "unspecified"] }).notNull().default("unspecified"),
   civilStatus: text("civil_status"),
+  nationality: text("nationality").notNull().default("Filipino"),
   contactNumber: text("contact_number"),
   email: text("email"),
+  address: text("address"),
+  barangay: text("barangay"),
+  municipality: text("municipality"),
+  province: text("province"),
+  occupation: text("occupation"),
   status: text("status", { enum: ["active", "inactive", "deceased", "moved_out"] }).notNull().default("active"),
+  registeredAt: text("registered_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   ...timestamps,
 }, (table) => [index("residents_name_idx").on(table.lastName, table.firstName), index("residents_status_idx").on(table.status)]);
 
@@ -84,6 +94,7 @@ export const households = sqliteTable("households", {
   addressLine: text("address_line").notNull(),
   purok: text("purok"),
   status: text("status", { enum: ["active", "inactive"] }).notNull().default("active"),
+  registeredAt: text("registered_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   ...timestamps,
 }, (table) => [index("households_purok_idx").on(table.purok), index("households_status_idx").on(table.status)]);
 
@@ -93,7 +104,7 @@ export const householdMembers = sqliteTable("household_members", {
   relationshipToHead: text("relationship_to_head").notNull(),
   isHouseholdHead: integer("is_household_head", { mode: "boolean" }).notNull().default(false),
   joinedAt: text("joined_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-}, (table) => [primaryKey({ columns: [table.householdId, table.residentId] }), index("household_members_resident_idx").on(table.residentId)]);
+}, (table) => [primaryKey({ columns: [table.householdId, table.residentId] }), uniqueIndex("household_members_resident_unique").on(table.residentId), index("household_members_resident_idx").on(table.residentId)]);
 
 export const documentTypes = sqliteTable("document_types", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -112,8 +123,13 @@ export const documentRequests = sqliteTable("document_requests", {
   residentId: integer("resident_id").notNull().references(() => residents.id, { onDelete: "restrict" }),
   documentTypeId: integer("document_type_id").notNull().references(() => documentTypes.id, { onDelete: "restrict" }),
   purpose: text("purpose").notNull(),
-  status: text("status", { enum: ["pending", "approved", "rejected", "cancelled", "issued"] }).notNull().default("pending"),
+  status: text("status", { enum: ["pending", "approved", "rejected", "released", "cancelled"] }).notNull().default("pending"),
   requestedAt: text("requested_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  requestedByUserId: integer("requested_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  approvedByUserId: integer("approved_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  approvedAt: text("approved_at"),
+  releasedByUserId: integer("released_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  releasedAt: text("released_at"),
   reviewedByUserId: integer("reviewed_by_user_id").references(() => users.id, { onDelete: "set null" }),
   reviewedAt: text("reviewed_at"),
   rejectionReason: text("rejection_reason"),
@@ -135,6 +151,24 @@ export const documents = sqliteTable("documents", {
   voidReason: text("void_reason"),
   ...timestamps,
 }, (table) => [index("documents_resident_idx").on(table.residentId), index("documents_status_idx").on(table.status), index("documents_type_idx").on(table.documentTypeId)]);
+
+export const blotterCases = sqliteTable("blotter_cases", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  caseNumber: text("case_number").notNull().unique(),
+  reportedAt: text("reported_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  complainant: text("complainant").notNull(),
+  respondent: text("respondent"),
+  incidentAt: text("incident_at"),
+  incidentLocation: text("incident_location"),
+  incidentDescription: text("incident_description").notNull(),
+  actionTaken: text("action_taken"),
+  status: text("status", { enum: ["open", "under_investigation", "resolved", "closed", "cancelled"] }).notNull().default("open"),
+  assignedOfficialId: integer("assigned_official_id").references(() => users.id, { onDelete: "set null" }),
+  resolution: text("resolution"),
+  resolvedAt: text("resolved_at"),
+  closedAt: text("closed_at"),
+  ...timestamps,
+}, (table) => [index("blotter_cases_status_idx").on(table.status), index("blotter_cases_reported_at_idx").on(table.reportedAt), index("blotter_cases_assigned_idx").on(table.assignedOfficialId)]);
 
 export const auditLogs = sqliteTable("audit_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
